@@ -14,7 +14,7 @@ C_SRCS = $(wildcard $(SDIR)/*.c)
 S_OBJS = $(S_SRCS:$(SDIR)/%.s=$(BDIR)/%_asm.o)
 C_OBJS = $(C_SRCS:$(SDIR)/%.c=$(BDIR)/%.o)
 
-all: clean kernel.img kernel.s
+all: clean $(BDIR)/kernel.img $(BDIR)/kernel.s
 
 $(BDIR)/kernel.img: $(BDIR)/kernel.elf
 	$(OBJCOPY) $< -O binary $@
