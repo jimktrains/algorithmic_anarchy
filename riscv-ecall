@@ -1,0 +1,114 @@
+rv64imdb
+  (i)nteger
+  integer (m)ultiplication/division
+  basic (b)itwise
+  (d)ouble precision
+
+ECALL
+  a7=
+    0x25 Set signal vector
+    0x39 Create subdirectory
+    0x3a Remove subdirectory
+    0x3c Create file by name
+    0x3d Open file handle
+    0x3e Close file handle
+    0x3f Read file handle
+    0x40 Write file handle
+    0x41 Delete file by name 
+    0x42 Seek file handle
+    0x43 Truncate file handle
+    0x60 Get file contents by name
+    0x61 Write file contents by name
+
+
+"Everything is a file"
+Append .schema to get the Cap’n Proto schema
+/sys
+  /chrono
+    /current
+    /timers
+  /log
+/craft
+  /id
+  /name
+  /adf
+  /ins
+  /radar
+  /fuel
+/data
+
+Hardware Modules show up as USB devices:
+.... or we'll just use a dumb text protocol because it's a lot easier to
+get that working without modifying qemu or reverse engineering usbredir
+
+  All USB Devices MUST report the following USB Descriptor Fields:
+    idVendor  = 1209 Generic
+    idProduct =	0001 pid.codes Test PID
+    iManufacturer
+    iProduct
+    iSerial     (This will be filled in by the game when it installs the module)
+
+  Chronometer
+    Sensor.Real Time Clock (Input)
+      Year
+      Month
+      Day
+      Day of Week
+      Hour
+      Minute
+      Second
+      Millisecond
+      Time Zone Oﬀset from UTC
+      Julian Day of Year
+      Time Since System Boot 
+    Sensor.Alarm Timer (Input and Output Array)
+      Seconds
+  
+  IRS (Heliocentric Ecliptic coordinate System J2000.0)
+    Sensor.Location: Dead Reckoning
+      Latitude
+      Longitude
+      Distance
+    Sensor.Orientation (Relative to a direct vector to the sun and the ZY-plane perpendicular to the ecliptic)
+      Tilt Z Axis (Yaw)
+      Tilt Y Axis (Pitch)
+      Tile X Axis (Roll)
+    Sensor.Motion: Accelerometer 3D
+      Acceleration Axis X
+      Acceleration Axis Y
+      Acceleration Axis Z
+    Sensor.Motion: Gyrometer 3D
+      Angular Velocity about X Axis
+      Angular Velocity about Y Axis
+      Angular Velocity about Z Axis
+  Radar
+    Digitizer.3D Digitizer + Multi-touch Digitizer (Relative to craft)
+      Contact Count
+      Array
+        Contact Identifier
+        Azimuth
+        Altitude (angle)
+        Tip Pressure (distance to contact)
+  Fuel
+    Scale.Scale Data Report
+      Data Weight (in grams)
+  Thrusters
+    Game Control.Point of View
+      Turn Right/Left (Yaw)
+      Pitch Forward/Backward (Pitch)
+      Roll Right/Left (Roll)
+      Move Right/Left (Y)
+      Move Forward/Backward (X)
+      Move Up/Down (Z)
+  Radio Modem
+    CAT over ACM
+  Log
+    ACM
+
+
+
+> list
+< 
+
+
+
