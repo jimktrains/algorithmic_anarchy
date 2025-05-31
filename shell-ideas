@@ -1,0 +1,133 @@
+/ % ls
+
+directory/
+me/
+ships/
+
+/ % ls me
+gid                        SHA256:/LJ7h7ebIslv3/3lSK9hOq5pE7mxbl/b7HntTKDZbZg
+username                   jimktrains
+funds                     Ꞥ 123.45 NN (Nonsense Notes)
+
+/ % cd ships
+
+/ships % ls
+Bashful_Raven/
+Futuristic_Hedgehog/
+
+/ships% cd Bashful_Raven
+
+/ships/Bashful_Raven % ls
+adf/
+chronometer/
+computer/
+craft/
+fuel/
+irs/
+thrusters/
+
+/ships/Bashful_Raven % ls craft
+craft/cargo_manifest/
+craft/cargo_mass             10 Mg
+craft/gid                  CRAFT VICE SHAM KEN MOON MORE ALTO
+craft/make                 Rocket Rascals
+craft/mass                 2030 Mg
+craft/max_cargo_mass         35 Mg
+craft/model                The Everyday Explorer
+craft/model_year           2025
+craft/name                 Bashful_Raven
+
+/ships/Bashful_Raven % cd chronometer
+
+/ships/Bashful_Raven/chronometer % ls
+current_time               2460825.446343
+gid                        TIME UP BLOB FAIL SKIM HEAL TRIM
+make                       Humorology
+model                      Second Hand Shenanigans
+model_year                 2025
+
+/ships/Bashful_Raven/chronometer % ls ../irs/position
+../irs/position/latitude     -0° 00' 00.1"
+../irs/position/longitude   248° 48' 21.4"
+../irs/position/radius        1.0136524 AU
+
+/ships/Bashful_Raven/chronometer % ls ../irs/orientation
+../irs/orientation/pitch      0° 00' 03.0"
+../irs/orientation/roll       0° 00' 00.0"
+../irs/orientation/yaw       75° 28' 14.6"
+
+/ships/Bashful_Raven/chronometer % cd ..
+
+/ships/Bashful_Raven % ls thrusters/**/throttle
+thrusters/attitute/pitch/throttle 0.0
+thrusters/attitute/roll/throttle  0.0
+thrusters/attitute/yaw/throttle   0.5
+thrusters/postition/x/throttle    0.3
+thrusters/postition/y/throttle    0.0
+thrusters/postition/z/throttle    0.0
+
+/ships/Bashful_Raven % set thrusters/attitute/yaw 0
+
+/ships/Bashful_Raven % set thrusters/postition/x 0
+
+/ships/Bashful_Raven % cd thrusters/thrusters/position/x
+
+/ships/Bashful_Raven/thrusters/thrusters/position/x % ls
+gid                            THRUST WIT SANK DUKE STEM FLOW VICE
+hobbs                            35.5 hr
+make                           Rocket Ruckus Inc
+max_mass_flow_rate                0.78 kg / s
+model                          Chuckle Charger
+model_year                     2025
+specific_impulse                331.4361 s
+throttle                          0.0
+
+/ships/Bashful_Raven/thrusters/thrusters/position/x % cd /ships/Bashful_Raven
+
+/ships/Bashful_Raven % cd computer
+
+/ships/Bashful_Raven/computer % ls -R
+firmware/date                  2460824.346343
+firmware/hash                  0CtDQMqMk3o7zeyaPkLTT8NpbnE=
+gid                            COMP COG ABEL TAR CAST LILT KATE
+hobbs                           1027.9 hr
+make                           Silly Circuits
+model                          Bubbly Byter
+model_year                     2022
+persistient_params/f0             0.0780953
+   ... skipping 126 zero parameters
+persistient_params/i0          342705627180376
+   ... skipping 31 zero parameters
+
+/ships/Bashful_Raven/computer % cd ..
+
+/ships/Bashful_Raven % ls -R adf
+adf/beacon0/bearing/distance      0.324 AU
+adf/beacon0/bearing/pitch         1° 00' 31.0"
+adf/beacon0/bearing/yaw           0° 43' 03.0"
+adf/beacon0/gid                   BEAK FITS ALIA ETC BYE BALL DRUB 
+
+/ships/Bashful_Raven % cd /directory
+
+/directory % ls
+asteroids/
+comets/
+nav_beacons/
+planets/
+space_stations/
+
+/directory % cd space_stations
+
+/directory/space_stations % ls
+Gravitational_Guffaw/            Earth L4
+Jovial_Jamboree/                 Jupiter Orbit
+Spacey_McSpaceface/              Earth Orbit
+
+/directory/space_stations % cd Spacey_McSpaceface/
+
+/directory/space_stations/Spacey_McSpaceface % ls
+frequencies/
+gid                              STAY LILT SLOW RED WOOL SIGH ROD
+keplarian_elements/
+position/
+short_description                Earth Orbit

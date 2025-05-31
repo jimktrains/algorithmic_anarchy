@@ -7,6 +7,10 @@ instructions. Map spacecraft systems into the memory space.  Map common
 functions into the address space, and (maybe?) handle them special in
 the emulator such that they incure a reduced instruction count.
 
+The other option is having all of the functions defined via macros and
+inline assembly to be an ecall, but handling them as special cases of jal,
+j, and jalr seems to be easier and preserves some type checking.
+
 In addition to memory-mapped io, there is a section of memory that will
 be saved and reloaded each run. All other memory and registeres are
 reset.

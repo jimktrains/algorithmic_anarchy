@@ -1,0 +1,7 @@
+[package]
+name = "bubbly_byter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rvemu = { path = "/home/jim/projects/other/stupid-ideas/github.com/d0iasm/rvemu" }

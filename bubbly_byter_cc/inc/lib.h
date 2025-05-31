@@ -29,8 +29,8 @@ extern struct __attribute__((packed, aligned(8))) {
   double current;
 } chrono;
 
-extern double savedd[128];
-extern uint64_t savedi[16];
+
+extern char __attribute__((aligned(8))) saved[2048];
 
 extern double fcn(double d);
 extern void x(double *v);
@@ -48,16 +48,15 @@ extern double  fmax(double, double);
 extern double  fmin(double, double);
 extern double  exp(double);
 extern double  expm1(double);
-extern double  log(double);
-extern double  log1p(double);
+extern double  ln(double);
+extern double  ln1p(double);
 extern double  sqrt(double);
 extern double  cbrt(double);
-extern double  cube(double);
 extern double  hypot2(double, double);
 extern double  ceil(double);
 extern double  floor(double);
 extern double  round(double);
-extern double  pow(double, double);
+extern double  fpowf(double, double);
 extern int64_t modpow(int64_t i, int64_t p, int64_t m);
 extern void    divmod(int64_t *q, int64_t *r, int64_t i, int64_t m);
 extern double  sin(double);

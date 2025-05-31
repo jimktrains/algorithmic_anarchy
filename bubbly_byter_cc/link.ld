@@ -2,9 +2,9 @@ OUTPUT_ARCH( "riscv" )
 ENTRY( _start )
 MEMORY
 {
-  ram   (wxa!ri) : ORIGIN = 0x200, LENGTH = 64K
-  rom   (rx) : ORIGIN = 128M, LENGTH = 128M
-  mmio  (rw) : ORIGIN = 1024M, LENGTH = 128M
+  ram   (wxa!ri) : ORIGIN = 1024M, LENGTH = 64K
+  rom   (rx) : ORIGIN = 0x80000400, LENGTH = 256M
+  mmio  (rw) : ORIGIN = ORIGIN(rom) + LENGTH(rom), LENGTH = 256M
 }
 
 SECTIONS
@@ -15,6 +15,7 @@ SECTIONS
   {
     *(.init)
     *(.text)
+    *(.final)
  } > ram
  /* data: Initialized data segment */
  .data :
@@ -23,22 +24,20 @@ SECTIONS
  } > ram
  /* End of uninitalized data segement */
  _end = .;
- __stack_top = ORIGIN(ram) + LENGTH(ram) - 1;
 
  .memmapio :
  {
-   savedd = .; . += (128 * 8);
-   savedi = .; . += (16 * 8);
+   saved = .; . += 64K;
    chrono = .; . += 1;
-
- } > mmio
-
- .systemprovided : {
    n_bodies_data = 512;
    keplarian_elements = .; . += (6 * (8 * n_bodies_data));
    masses             = .; . += (8 * n_bodies_data);
    diameter           = .; . += (8 * n_bodies_data);
    body_names         = .; . += (30 * n_bodies_data);
+
+ } > mmio
+
+ .systemprovided : {
 
    fcn   = .; . += 8;
    xx    = .; . += 8;
