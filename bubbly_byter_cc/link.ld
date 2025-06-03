@@ -5,6 +5,7 @@ MEMORY
   ram   (wxa!ri) : ORIGIN = 1024M, LENGTH = 64K
   rom   (rx) : ORIGIN = 0x80000400, LENGTH = 256M
   mmio  (rw) : ORIGIN = ORIGIN(rom) + LENGTH(rom), LENGTH = 256M
+  nvram (rw) : ORIGIN = ORIGIN(mmio) + LENGTH(mmio), LENGTH = 256M
 }
 
 SECTIONS
@@ -27,15 +28,13 @@ SECTIONS
 
  .memmapio :
  {
-   saved = .; . += 64K;
-   chrono = .; . += 1;
-   n_bodies_data = 512;
-   keplarian_elements = .; . += (6 * (8 * n_bodies_data));
-   masses             = .; . += (8 * n_bodies_data);
-   diameter           = .; . += (8 * n_bodies_data);
-   body_names         = .; . += (30 * n_bodies_data);
-
+   chrono = .; . += 8;
  } > mmio
+
+ .nvram :
+ {
+   saved = .; . += 64K;
+ } > nvram
 
  .systemprovided : {
 
@@ -104,6 +103,15 @@ SECTIONS
     vnormalize3 = .; . += 8;
     vlerp33s = .; . += 8;
 
+   n_bodies_count = 512;
+
+   celestials = .;
+   . += n_bodies_count * (
+     (6 * 8) + /* keplarian elements */
+     8 + /* mass */
+     8 + /* diameter */
+     32 /* name */
+   );
  } > rom
 
  }

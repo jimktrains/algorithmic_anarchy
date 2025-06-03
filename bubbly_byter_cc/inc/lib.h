@@ -30,7 +30,7 @@ extern struct __attribute__((packed, aligned(8))) {
 } chrono;
 
 
-extern char __attribute__((aligned(8))) saved[2048];
+extern char __attribute__((aligned(8))) *saved;
 
 extern double fcn(double d);
 extern void x(double *v);
@@ -75,7 +75,7 @@ extern double  atanh(double);
 // erf
 // erfc
 // quadraticroots
-// evalpoly
+// horner
 // kepler
 //
 extern double dist33(double *a, double *b);
@@ -119,14 +119,23 @@ extern void vlerp33s(vec3_t *res, vec3_t *a, vec3_t *b, double t);
 
 #define M_AU          1.495978707e11  // m
 
-#define KE_SUN                      0
-#define KE_MERCURY                  1
-#define KE_VENUS                    2
-#define KE_EARTH_MOON_BARYCENTER    3
-#define KE_MARS                     4
-#define KE_JUPITER                  5
-#define KE_SATURN                   6
-#define KE_URANUS                   7
-#define KE_NEPTUNE                  8
+#define CO_SUN                      0
+#define CO_MERCURY                  1
+#define CO_VENUS                    2
+#define CO_EARTH_MOON_BARYCENTER    3
+#define CO_MARS                     4
+#define CO_JUPITER                  5
+#define CO_SATURN                   6
+#define CO_URANUS                   7
+#define CO_NEPTUNE                  8
 // ... for the moons https://ssd.jpl.nasa.gov/sats/elem/
 // ... and the small bodies https://ssd.jpl.nasa.gov/sb/elem_tables.html
+
+struct __attribute__((packed, aligned(8))) celobjdat {
+  struct keplarian_elements ke;
+  double mass;
+  double diameter;
+  char name[32];
+};
+
+extern struct celobjdat *celestials;

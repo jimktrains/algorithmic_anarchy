@@ -7,8 +7,8 @@ double v[3];
 double *saved_doubles;
 
 int main() {
-  saved_doubles =  (double *)saved;
-  double cc = saved_doubles[10];
+  saved_doubles =  (double *)&saved;
+  double cc = ((struct celobjdat *)&celestials)[CO_MARS].mass;
 
   for (int i = 0; i < 10; i++) {
     cc = cos(cc);

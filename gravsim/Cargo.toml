@@ -1,0 +1,7 @@
+[package]
+name = "gravsim"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rusty_units = "0.1.0"
