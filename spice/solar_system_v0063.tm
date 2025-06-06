@@ -3,6 +3,9 @@ KPL/MK
    This meta-kernel lists the latest generic kernels for planets, 
    satellites, and some asteroids.
 
+   https://naif.jpl.nasa.gov/pub/naif/generic_kernels
+   https://ssd.jpl.nasa.gov/ftp/eph/small_bodies/asteroids_de441/
+
    \begindata
 
       PATH_VALUES       = (
@@ -66,6 +69,10 @@ KPL/MK
                            '$DATA/spk/ura117.bsp'
                            '$DATA/spk/ura182.bsp'
                            '$DATA/spk/de442.bsp'
+                           '$DATA/spk/sb441-n373s.bsp'
+                           '$DATA/spk/sb441-n16.bsp'
+                           '$DATA/spk/sb441-n373.bsp'
+                           '$DATA/spk/ast343de430.bsp'
                           )
 
    \begintext
