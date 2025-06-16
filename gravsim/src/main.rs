@@ -2,7 +2,7 @@
 
 use std::default::Default;
 use std::io::Write;
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub};
+use std::ops::{Add, AddAssign, MulAssign};
 
 use std::fs::File;
 use std::io::BufRead;
@@ -19,6 +19,8 @@ use uom::si::f64::Length;
 use uom::si::length::meter;
 
 use nalgebra::Vector3;
+
+type Vec3 = Vector3<f64>;
 
 // OK, so it looks this is 1/g_0 * 10^11.
 // I'm not sure where the 10^11 comes from.
@@ -175,186 +177,6 @@ impl InitState {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-struct Vec3 {
-    x: f64,
-    y: f64,
-    z: f64,
-}
-
-#[allow(dead_code)]
-impl Vec3 {
-    fn gpformat(&self) -> Vec<u8> {
-        format!("{}\t{}\t{}\n", self.x, self.y, self.z).into_bytes()
-    }
-}
-
-impl AddAssign<&Vec3> for Vec3 {
-    fn add_assign(&mut self, rhs: &Vec3) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-        self.z += rhs.z;
-    }
-}
-
-impl AddAssign<Vec3> for Vec3 {
-    fn add_assign(&mut self, rhs: Vec3) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-        self.z += rhs.z;
-    }
-}
-
-impl Add for Vec3 {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-            z: self.z + rhs.z,
-        }
-    }
-}
-
-impl Add<&Vec3> for Vec3 {
-    type Output = Self;
-
-    fn add(self, rhs: &Self) -> Self::Output {
-        Self {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-            z: self.z + rhs.z,
-        }
-    }
-}
-
-impl Add<&Vec3> for &Vec3 {
-    type Output = Vec3;
-
-    fn add(self, rhs: &Vec3) -> Self::Output {
-        Self::Output {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-            z: self.z + rhs.z,
-        }
-    }
-}
-
-impl Sub<&Vec3> for &Vec3 {
-    type Output = Vec3;
-
-    fn sub(self, rhs: &Vec3) -> Self::Output {
-        Self::Output {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-            z: self.z - rhs.z,
-        }
-    }
-}
-
-impl Sub for Vec3 {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self::Output {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-            z: self.z - rhs.z,
-        }
-    }
-}
-
-impl MulAssign<f64> for Vec3 {
-    fn mul_assign(&mut self, rhs: f64) {
-        self.x *= rhs;
-        self.y *= rhs;
-        self.z *= rhs;
-    }
-}
-
-impl Mul<f64> for Vec3 {
-    type Output = Vec3;
-
-    fn mul(self, rhs: f64) -> Self::Output {
-        Self::Output {
-            x: self.x * rhs,
-            y: self.y * rhs,
-            z: self.z * rhs,
-        }
-    }
-}
-
-impl Mul<f64> for &Vec3 {
-    type Output = Vec3;
-
-    fn mul(self, rhs: f64) -> Self::Output {
-        Self::Output {
-            x: self.x * rhs,
-            y: self.y * rhs,
-            z: self.z * rhs,
-        }
-    }
-}
-
-impl Div<f64> for Vec3 {
-    type Output = Vec3;
-
-    fn div(self, rhs: f64) -> Self::Output {
-        Self::Output {
-            x: self.x / rhs,
-            y: self.y / rhs,
-            z: self.z / rhs,
-        }
-    }
-}
-
-impl Neg for &Vec3 {
-    type Output = Vec3;
-
-    fn neg(self) -> Self::Output {
-        Vec3 {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-        }
-    }
-}
-
-impl Neg for Vec3 {
-    type Output = Vec3;
-
-    fn neg(self) -> Self::Output {
-        Vec3 {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-        }
-    }
-}
-
-impl Div<f64> for &Vec3 {
-    type Output = Vec3;
-
-    fn div(self, rhs: f64) -> Self::Output {
-        Self::Output {
-            x: self.x / rhs,
-            y: self.y / rhs,
-            z: self.z / rhs,
-        }
-    }
-}
-
-#[allow(dead_code)]
-impl Vec3 {
-    pub fn l2_norm(&self) -> f64 {
-        let xd = self.x;
-        let yd = self.y;
-        let zd = self.z;
-        (xd.powi(2) + yd.powi(2) + zd.powi(2)).sqrt()
-    }
-}
-
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone)]
 struct SimObjDerivative {
@@ -429,7 +251,7 @@ struct SimVizState {
 }
 
 #[allow(dead_code)]
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Debug, Default, Clone)]
 struct SimObj {
     spkid: usize,
     position: Vec3,
@@ -633,7 +455,7 @@ impl NBodySimulation {
             for j in (i + 1)..self.bodies.len() {
                 if let Ok([a, b]) = self.bodies.get_disjoint_mut([i, j]) {
                     let r_vec = &a.position - &b.position;
-                    let r = r_vec.l2_norm();
+                    let r = r_vec.norm();
                     // r^3 because it's r^2 in the law of gravity and an
                     // extra r to normalize the r̄ vector.
                     let f = r_vec * self.G * a.mass * b.mass / r.powi(3);
@@ -657,16 +479,8 @@ impl NBodySimulation {
             if let Some(p) = p.by_spkid(i.spkid) {
                 sim.bodies.push(SimObj {
                     spkid: i.spkid,
-                    position: Vec3 {
-                        x: i.x,
-                        y: i.y,
-                        z: i.z,
-                    },
-                    velocity: Vec3 {
-                        x: i.dx,
-                        y: i.dy,
-                        z: i.dz,
-                    },
+                    position: Vec3::new(i.x, i.y, i.z),
+                    velocity: Vec3::new(i.dx, i.dy, i.dz),
                     mass: p.gm * GM_TO_GRAM,
                 });
             } else {
@@ -739,30 +553,18 @@ fn main() -> std::io::Result<()> {
                 sim.t / day / (Instant::now() - start).as_secs_f64(),
             );
         }
-        //f.write_all(&sim.bodies[0].position.gpformat())?;
         let enc_res = serde_binary::to_vec(&sim, Endian::Little);
         if let Ok(bytes) = enc_res {
             fb.write_all(&bytes)?;
         } else {
             println!("{:?}", enc_res);
         }
-        // for i in 0..sim.bodies.len() {
-        //     let b = &sim.bodies[i];
-        //     let p = &b.position;
-        //     // let c = COLORS[i];
-        //     // let state = b.viz_state(i, sim.t);
-        //     // let enc_res = serde_binary::to_vec(&sim, Endian::Little);
-        //     // if let Ok(bytes) = enc_res {
-        //     //     fb.write_all(&bytes)?;
-        //     // } else {
-        //     //     println!("{:?}", enc_res);
-        //     // }
-
-        //     ft.write_all(
-        //         format!("{} {} {} {} {} {}\n", p.x, p.y, p.z, i, sim.t, b.spkid).as_bytes(),
-        //     )?;
-        // }
-        //}
+        for (i, b) in sim.bodies.iter().enumerate() {
+            let p = &b.position;
+            ft.write_all(
+                format!("{} {} {} {} {} {}\n", p.x, p.y, p.z, i, sim.t, b.spkid).as_bytes(),
+            )?;
+        }
     }
     Ok(())
 }
