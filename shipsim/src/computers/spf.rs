@@ -1,7 +1,8 @@
 // System Provided Function
-
+use crate::ships::everyday_explorer::EverydayExplorer;
 use rvemu::cpu;
 use rvemu::cpu::{Cpu, FRegisters, JumpLinkHandler, XRegisters};
+use std::sync::{Arc, Mutex};
 
 pub const SPF_MIN_ADDR: u64 = 0x8000_0000;
 
@@ -61,16 +62,32 @@ pub const SPF_ATANH: u64 = 0x80000530;
 // pub const SPF_VNORM3: u64 = 0x800005d0;
 // pub const SPF_VNORMALIZE3: u64 = 0x800005d8;
 // pub const SPF_VLERP33S: u64 = 0x800005e0;
+pub const SPF_GET_PARAMF: u64 = 0x800005e8;
+pub const SPF_SET_PARAMF: u64 = 0x800005f0;
+pub const SPF_ERR: u64 = 0x800005f8;
 
-pub struct SysProvided {}
+pub struct SysProvided {
+    ship: Arc<Mutex<EverydayExplorer>>,
+    err: Arc<Mutex<u64>>,
+}
+
+impl SysProvided {
+    pub fn new(ship: Arc<Mutex<EverydayExplorer>>) -> Self {
+        Self {
+            ship: ship,
+            err: Arc::new(Mutex::new(0)),
+        }
+    }
+}
 
 impl JumpLinkHandler for SysProvided {
     fn should_handle(&self, new_pc: u64) -> bool {
         new_pc >= SPF_MIN_ADDR
     }
     fn handle(&self, new_pc: u64, cpu: &Cpu) -> (XRegisters, FRegisters) {
-        let xregs = cpu.xregs.clone();
+        let mut xregs = cpu.xregs.clone();
         let mut fregs = cpu.fregs.clone();
+        *self.err.lock().unwrap() = 0;
         match new_pc {
             SPF_EXP => fregs.write(cpu::REG_FA0, fregs.read(cpu::REG_FA0).exp()),
             SPF_EXPM1 => fregs.write(cpu::REG_FA0, fregs.read(cpu::REG_FA0).exp_m1()),
@@ -103,6 +120,37 @@ impl JumpLinkHandler for SysProvided {
             SPF_ATANH => fregs.write(cpu::REG_FA0, fregs.read(cpu::REG_FA0).atanh()),
             SPF_FCN => {
                 fregs.write(cpu::REG_FA1, 654.321);
+            }
+            SPF_ERR => {
+                xregs.write(cpu::REG_A0, *self.err.lock().unwrap());
+            }
+            SPF_GET_PARAMF => {
+                let v = self
+                    .ship
+                    .lock()
+                    .unwrap()
+                    .get_paramf(xregs.read(cpu::REG_A0));
+                if let Some(v) = v {
+                    fregs.write(cpu::REG_FA0, v);
+                    xregs.write(cpu::REG_A0, 0);
+                } else {
+                    fregs.write(cpu::REG_FA0, 0.0);
+                    xregs.write(cpu::REG_A0, 1);
+                    *self.err.lock().unwrap() = 1;
+                }
+            }
+            SPF_SET_PARAMF => {
+                let v = self
+                    .ship
+                    .lock()
+                    .unwrap()
+                    .set_paramf(xregs.read(cpu::REG_A0), fregs.read(cpu::REG_FA0));
+                if let Some(_v) = v {
+                    xregs.write(cpu::REG_A0, 0);
+                } else {
+                    xregs.write(cpu::REG_A0, 1);
+                    *self.err.lock().unwrap() = 1;
+                }
             }
             _ => {}
         }

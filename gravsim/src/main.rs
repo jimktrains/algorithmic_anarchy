@@ -11,6 +11,15 @@ use std::path::Path;
 use std::str::Split;
 use std::time::Instant;
 
+use binary_stream::Endian;
+use serde::ser::{SerializeTuple, Serializer};
+use serde::{Deserialize, Serialize};
+
+use uom::si::f64::Length;
+use uom::si::length::meter;
+
+use nalgebra::Vector3;
+
 // OK, so it looks this is 1/g_0 * 10^11.
 // I'm not sure where the 10^11 comes from.
 const GM_TO_GRAM: f64 = 1.498e19;
@@ -21,7 +30,7 @@ pub struct PhysicalConstants {
     spkid: usize,
     name: String,
     gm: f64,
-    radius: f64,
+    radius: Length,
 }
 
 pub struct PhysicalConstantsVec {
@@ -37,13 +46,12 @@ impl PhysicalConstantsVec {
         self.v.push(p);
     }
 
-    pub fn by_spkid(&self, spkid: usize) -> Option<PhysicalConstants> {
-        for p in self.v.iter() {
-            if p.spkid == spkid {
-                return Some(p.clone());
-            }
-        }
-        None
+    pub fn append(&mut self, p: &mut PhysicalConstantsVec) {
+        self.v.append(&mut p.v);
+    }
+
+    pub fn by_spkid(&self, spkid: usize) -> Option<&PhysicalConstants> {
+        self.v.iter().filter(|p| p.spkid == spkid).last()
     }
 
     pub fn by_name(&self, name: &str) -> Option<PhysicalConstants> {
@@ -75,10 +83,11 @@ impl PhysicalConstants {
             gm: gm_part
                 .parse::<f64>()
                 .expect(format!("gm {gm_part} is not a valid f64 for idx {idx}").as_str()),
-            radius: radius_part
-                .parse::<f64>()
-                .expect(format!("radius {radius_part} is not a valid f64 for idx {idx}").as_str())
-                * 1000.0,
+            radius: Length::new::<meter>(
+                radius_part.parse::<f64>().expect(
+                    format!("radius {radius_part} is not a valid f64 for idx {idx}").as_str(),
+                ) * 1000.0,
+            ),
         }
     }
 
@@ -166,7 +175,7 @@ impl InitState {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 struct Vec3 {
     x: f64,
     y: f64,
@@ -409,8 +418,18 @@ impl Add<&SimObjDerivative> for &SimObjDerivative {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct SimVizState {
+    spkid: usize,
+    bodyid: usize,
+    t: f32,
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
 #[allow(dead_code)]
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 struct SimObj {
     spkid: usize,
     position: Vec3,
@@ -423,6 +442,17 @@ struct SimObj {
 
 #[allow(dead_code)]
 impl SimObj {
+    pub fn viz_state(&self, i: usize, t: f64) -> SimVizState {
+        SimVizState {
+            bodyid: i,
+            spkid: self.spkid,
+            t: t as f32,
+            x: self.position.x as f32,
+            y: self.position.y as f32,
+            z: self.position.z as f32,
+        }
+    }
+
     #[allow(non_snake_case)]
     pub fn stable_orbit(&self, G: f64, r: f64) -> f64 {
         (G * self.mass / r).sqrt()
@@ -502,6 +532,20 @@ struct NBodySimulation {
     dt: f64,
     G: f64,
     t: f64,
+}
+
+impl Serialize for NBodySimulation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut tup = serializer.serialize_tuple(1 + self.bodies.len())?;
+        tup.serialize_element(&self.t)?;
+        for b in &self.bodies {
+            tup.serialize_element(&(b.spkid, b.position.x, b.position.y, b.position.z))?;
+        }
+        tup.end()
+    }
 }
 
 impl Add<NBodySimulation> for NBodySimulation {
@@ -590,6 +634,8 @@ impl NBodySimulation {
                 if let Ok([a, b]) = self.bodies.get_disjoint_mut([i, j]) {
                     let r_vec = &a.position - &b.position;
                     let r = r_vec.l2_norm();
+                    // r^3 because it's r^2 in the law of gravity and an
+                    // extra r to normalize the r̄ vector.
                     let f = r_vec * self.G * a.mass * b.mass / r.powi(3);
                     if let Ok([ad, bd]) = d.bodies.get_disjoint_mut([i, j]) {
                         ad.apply_acceleration(&(-&f / a.mass));
@@ -641,7 +687,7 @@ fn main() -> std::io::Result<()> {
         spkid: 999999999001,
         name: "MySatellite".to_owned(),
         gm: 250.0e3 / GM_TO_GRAM,
-        radius: 10.0,
+        radius: Length::new::<meter>(10.0),
     });
     let pc_earth = physical_constants.by_name("earth").unwrap();
     let rz = 6.3781e6 + 1e8;
@@ -678,29 +724,44 @@ fn main() -> std::io::Result<()> {
     let t_max = year;
     sim.dt = minute;
 
-    let mut f = File::create("output.txt")?;
+    let mut fb = File::create("output.bin")?;
+    let mut ft = File::create("output.txt")?;
 
     let start = Instant::now();
     while sim.t < t_max {
         sim.update();
         if sim.t % (7.0 * day) < 0.001 {
             println!(
-                "time={} (days={}) rate={} sim-s/real-s ({} sim-days/real-s)",
+                "time={} (days={}) rate= {} sim-cycles/real-s ({} sim-days/real-s)",
                 sim.t,
                 sim.t / day,
-                sim.t / (Instant::now() - start).as_secs_f64(),
+                (sim.t / sim.dt) / (Instant::now() - start).as_secs_f64(),
                 sim.t / day / (Instant::now() - start).as_secs_f64(),
             );
         }
         //f.write_all(&sim.bodies[0].position.gpformat())?;
-        for i in 0..sim.bodies.len() {
-            let b = &sim.bodies[i];
-            let p = &b.position;
-            // let c = COLORS[i];
-            f.write_all(
-                format!("{} {} {} {} {} {}\n", p.x, p.y, p.z, i, sim.t, b.spkid).as_bytes(),
-            )?;
+        let enc_res = serde_binary::to_vec(&sim, Endian::Little);
+        if let Ok(bytes) = enc_res {
+            fb.write_all(&bytes)?;
+        } else {
+            println!("{:?}", enc_res);
         }
+        // for i in 0..sim.bodies.len() {
+        //     let b = &sim.bodies[i];
+        //     let p = &b.position;
+        //     // let c = COLORS[i];
+        //     // let state = b.viz_state(i, sim.t);
+        //     // let enc_res = serde_binary::to_vec(&sim, Endian::Little);
+        //     // if let Ok(bytes) = enc_res {
+        //     //     fb.write_all(&bytes)?;
+        //     // } else {
+        //     //     println!("{:?}", enc_res);
+        //     // }
+
+        //     ft.write_all(
+        //         format!("{} {} {} {} {} {}\n", p.x, p.y, p.z, i, sim.t, b.spkid).as_bytes(),
+        //     )?;
+        // }
         //}
     }
     Ok(())

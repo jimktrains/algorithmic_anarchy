@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rusty_units = "0.1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde-binary = "0.5.0"
+binary-stream = "3.4.0"
+nalgebra = "0.33.2"
+uom = "0.37.0"
