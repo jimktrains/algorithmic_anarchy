@@ -416,7 +416,7 @@ trait Integrator {
     where
         T: Differentiable<DT> + Add<Output = T> + AddAssign + 'a,
         &'a mut T: AddAssign<T>,
-        &'a T: Add<T, Output = &'a T>,
+        &'a T: Add<T, Output = T>,
         DT: Derivative<T>
             + Default
             + MulAssign<f64>
@@ -448,11 +448,11 @@ struct RungeKutta3;
  *
  */
 impl Integrator for RungeKutta3 {
-    fn step<'a, T, DT>(self, mut start: &'a mut T, dt: f64)
+    fn step<'a, T, DT>(self, start: &'a mut T, dt: f64)
     where
         T: Differentiable<DT> + Add<Output = T> + AddAssign + 'a,
         &'a mut T: AddAssign<T>,
-        &'a T: Add<T, Output = &'a T>,
+        &'a T: Add<T, Output = T>,
         DT: Derivative<T>
             + Default
             + MulAssign<f64>
@@ -472,7 +472,7 @@ impl Integrator for RungeKutta3 {
 
         let mut d = k1 + k2 + k3 + k4;
         d *= 1.0 / 6.0;
-        start += d.step(dt);
+        *start += d.step(dt);
     }
 }
 
