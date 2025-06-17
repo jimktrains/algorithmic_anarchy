@@ -1,24 +1,25 @@
 // ref https://patrickyoussef.com/blog/nbody/
 
 use std::default::Default;
-use std::io::Write;
 use std::ops::{Add, AddAssign, MulAssign};
 
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io::Write;
 use std::path::Path;
 use std::str::Split;
 use std::time::Instant;
-
-use binary_stream::Endian;
-use serde::ser::{SerializeTuple, Serializer};
-use serde::{Deserialize, Serialize};
 
 use uom::si::f64::Length;
 use uom::si::length::meter;
 
 use nalgebra::Vector3;
+
+use gravsim::simstate_capnp::sim_state;
+
+use capnp::message;
+use capnp::serialize_packed;
 
 type Vec3 = Vector3<f64>;
 
@@ -240,16 +241,6 @@ impl Add<&SimObjDerivative> for &SimObjDerivative {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct SimVizState {
-    spkid: usize,
-    bodyid: usize,
-    t: f32,
-    x: f32,
-    y: f32,
-    z: f32,
-}
-
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone)]
 struct SimObj {
@@ -264,17 +255,6 @@ struct SimObj {
 
 #[allow(dead_code)]
 impl SimObj {
-    pub fn viz_state(&self, i: usize, t: f64) -> SimVizState {
-        SimVizState {
-            bodyid: i,
-            spkid: self.spkid,
-            t: t as f32,
-            x: self.position.x as f32,
-            y: self.position.y as f32,
-            z: self.position.z as f32,
-        }
-    }
-
     #[allow(non_snake_case)]
     pub fn stable_orbit(&self, G: f64, r: f64) -> f64 {
         (G * self.mass / r).sqrt()
@@ -356,20 +336,6 @@ struct NBodySimulation {
     t: f64,
 }
 
-impl Serialize for NBodySimulation {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut tup = serializer.serialize_tuple(1 + self.bodies.len())?;
-        tup.serialize_element(&self.t)?;
-        for b in &self.bodies {
-            tup.serialize_element(&(b.spkid, b.position.x, b.position.y, b.position.z))?;
-        }
-        tup.end()
-    }
-}
-
 impl Add<NBodySimulation> for NBodySimulation {
     type Output = NBodySimulation;
     fn add(self, rhs: NBodySimulation) -> Self::Output {
@@ -402,6 +368,13 @@ impl Add<NBodySimulation> for &NBodySimulation {
         new
     }
 }
+impl AddAssign<NBodySimulation> for NBodySimulation {
+    fn add_assign(&mut self, rhs: NBodySimulation) {
+        for i in 0..self.bodies.len() {
+            self.bodies[i] += &rhs.bodies[i];
+        }
+    }
+}
 
 impl Add<&NBodySimulation> for &NBodySimulation {
     type Output = NBodySimulation;
@@ -427,6 +400,18 @@ impl Default for NBodySimulation {
 
 impl NBodySimulation {
     fn update(&mut self) {
+        self.simple_step();
+        self.t += self.dt;
+    }
+
+    #[allow(dead_code)]
+    fn simple_step(&mut self) {
+        let d = self.derivative().step(self.dt);
+        *self += d;
+    }
+
+    #[allow(dead_code)]
+    fn runge_kutta_3(&mut self) {
         let k1 = self.derivative();
         let mut k2 = (&*self + k1.step(self.dt / 2.0)).derivative();
         let mut k3 = (&*self + k2.step(self.dt / 2.0)).derivative();
@@ -438,11 +423,7 @@ impl NBodySimulation {
         let mut d = k1 + k2 + k3 + k4;
         d *= 1.0 / 6.0;
         let d = d.step(self.dt);
-        for i in 0..self.bodies.len() {
-            self.bodies[i] += &d.bodies[i];
-        }
-
-        self.t += self.dt;
+        *self += d;
     }
 
     fn derivative(&mut self) -> NBodySimulationDerivative {
@@ -538,7 +519,7 @@ fn main() -> std::io::Result<()> {
     let t_max = year;
     sim.dt = minute;
 
-    let mut fb = File::create("output.bin")?;
+    let fc = File::create("output.cnp.bin")?;
     let mut ft = File::create("output.txt")?;
 
     let start = Instant::now();
@@ -553,18 +534,36 @@ fn main() -> std::io::Result<()> {
                 sim.t / day / (Instant::now() - start).as_secs_f64(),
             );
         }
-        let enc_res = serde_binary::to_vec(&sim, Endian::Little);
-        if let Ok(bytes) = enc_res {
-            fb.write_all(&bytes)?;
-        } else {
-            println!("{:?}", enc_res);
-        }
+
+        let mut message = message::Builder::new_default();
+        let mut state = message.init_root::<sim_state::Builder>();
+        state.set_time(sim.t);
+        let mut bodies = state.init_bodies(sim.bodies.len() as u32);
+
         for (i, b) in sim.bodies.iter().enumerate() {
             let p = &b.position;
+
             ft.write_all(
                 format!("{} {} {} {} {} {}\n", p.x, p.y, p.z, i, sim.t, b.spkid).as_bytes(),
             )?;
+
+            let mut body = bodies.reborrow().get(i as u32);
+            body.set_spkid(b.spkid as u64);
+            body.set_x(p.x);
+            body.set_y(p.y);
+            body.set_z(p.z);
+        }
+        let r = serialize_packed::write_message(&fc, &message);
+        if let Err(e) = r {
+            println!("{:?}", e);
         }
     }
+    println!(
+        "total time={} (days={}) rate= {} sim-cycles/real-s ({} sim-days/real-s)",
+        sim.t,
+        sim.t / day,
+        (sim.t / sim.dt) / (Instant::now() - start).as_secs_f64(),
+        sim.t / day / (Instant::now() - start).as_secs_f64(),
+    );
     Ok(())
 }

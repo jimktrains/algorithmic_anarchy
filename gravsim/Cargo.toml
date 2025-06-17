@@ -9,3 +9,7 @@ serde-binary = "0.5.0"
 binary-stream = "3.4.0"
 nalgebra = "0.33.2"
 uom = "0.37.0"
+capnp = "0.21"
+
+[build-dependencies]
+capnpc = "0.21"
