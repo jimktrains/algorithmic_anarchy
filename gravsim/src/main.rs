@@ -6,16 +6,20 @@ use std::ops::{Add, AddAssign, MulAssign};
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::io::Write;
 use std::path::Path;
 use std::str::Split;
 use std::time::Instant;
+
+// used for write_all and I don't feel like editing the top and bottom
+// of the file if I want the text output back, so here's a comment.
+// use std::io::Write;
 
 use uom::si::f64::Length;
 use uom::si::length::meter;
 
 use nalgebra::Vector3;
 
+use gravsim::simstate_capnp::physical_constants;
 use gravsim::simstate_capnp::sim_state;
 
 use capnp::message;
@@ -30,7 +34,7 @@ const GM_TO_GRAM: f64 = 1.498e19;
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct PhysicalConstants {
-    spkid: usize,
+    spkid: u64,
     name: String,
     gm: f64,
     radius: Length,
@@ -53,7 +57,7 @@ impl PhysicalConstantsVec {
         self.v.append(&mut p.v);
     }
 
-    pub fn by_spkid(&self, spkid: usize) -> Option<&PhysicalConstants> {
+    pub fn by_spkid(&self, spkid: u64) -> Option<&PhysicalConstants> {
         self.v.iter().filter(|p| p.spkid == spkid).last()
     }
 
@@ -71,8 +75,8 @@ impl PhysicalConstants {
     fn new_r_in_km(parts: &mut Split<'_, &str>) -> PhysicalConstants {
         let idx_part = parts.next().unwrap().trim();
         let idx = idx_part
-            .parse::<usize>()
-            .expect(format!("idx {idx_part} is not a usize").as_str());
+            .parse::<u64>()
+            .expect(format!("idx {idx_part} is not a u64").as_str());
 
         let spkid_part = parts.next().unwrap().trim();
         let name = parts.next().unwrap().trim().to_owned();
@@ -80,8 +84,8 @@ impl PhysicalConstants {
         let radius_part = parts.next().unwrap().trim();
         PhysicalConstants {
             spkid: spkid_part
-                .parse::<usize>()
-                .expect(format!("spkid {spkid_part} is not a valid usize for idx {idx}").as_str()),
+                .parse::<u64>()
+                .expect(format!("spkid {spkid_part} is not a valid u64for idx {idx}").as_str()),
             name: name,
             gm: gm_part
                 .parse::<f64>()
@@ -114,7 +118,7 @@ impl PhysicalConstants {
 
 #[derive(Debug)]
 struct InitState {
-    spkid: usize,
+    spkid: u64,
     x: f64,
     y: f64,
     z: f64,
@@ -127,7 +131,7 @@ impl InitState {
     fn new(parts: &mut Split<'_, &str>) -> Self {
         let spkid_part = parts.next().unwrap();
         let spkid = spkid_part
-            .parse::<usize>()
+            .parse::<u64>()
             .expect(format!("invalid spkid {spkid_part}").as_str());
         let x_part = parts.next().unwrap().trim();
         let y_part = parts.next().unwrap().trim();
@@ -137,7 +141,7 @@ impl InitState {
         let dz_part = parts.next().unwrap().trim();
         Self {
             spkid: spkid_part
-                .parse::<usize>()
+                .parse::<u64>()
                 .expect(format!("invalid spkid {spkid_part} for spkid {spkid}").as_str()),
             x: x_part
                 .parse::<f64>()
@@ -181,7 +185,7 @@ impl InitState {
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone)]
 struct SimObjDerivative {
-    spkid: usize,
+    spkid: u64,
     velocity: Vec3,
     acceleration: Vec3,
 }
@@ -244,14 +248,11 @@ impl Add<&SimObjDerivative> for &SimObjDerivative {
 #[allow(dead_code)]
 #[derive(Debug, Default, Clone)]
 struct SimObj {
-    spkid: usize,
+    spkid: u64,
     position: Vec3,
     velocity: Vec3,
     mass: f64,
 }
-
-// const G_0: f64 = 6.67408e-11;
-// const G: f64 = 1.0;
 
 #[allow(dead_code)]
 impl SimObj {
@@ -286,13 +287,25 @@ impl Add<&SimObj> for &SimObj {
     }
 }
 
+trait Derivative<T> {
+    fn step(&self, dt: f64) -> T;
+}
+
+trait Differentiable<T>
+where
+    T: Derivative<Self> + Default,
+    Self: Sized,
+{
+    fn derivative(&self) -> T;
+}
+
 #[derive(Debug, Clone)]
 struct NBodySimulationDerivative {
     bodies: Vec<SimObjDerivative>,
 }
 
-impl NBodySimulationDerivative {
-    pub fn step(&self, dt: f64) -> NBodySimulation {
+impl Derivative<NBodySimulation> for NBodySimulationDerivative {
+    fn step(&self, dt: f64) -> NBodySimulation {
         let mut s = NBodySimulation::default();
         s.bodies.reserve(self.bodies.len());
         for b in self.bodies.iter() {
@@ -426,33 +439,9 @@ impl NBodySimulation {
         *self += d;
     }
 
-    fn derivative(&mut self) -> NBodySimulationDerivative {
-        let mut d = NBodySimulationDerivative::default();
-        d.bodies.reserve(self.bodies.len());
-        for b in self.bodies.iter() {
-            d.bodies.push(b.derivative());
-        }
-        for i in 0..self.bodies.len() {
-            for j in (i + 1)..self.bodies.len() {
-                if let Ok([a, b]) = self.bodies.get_disjoint_mut([i, j]) {
-                    let r_vec = &a.position - &b.position;
-                    let r = r_vec.norm();
-                    // r^3 because it's r^2 in the law of gravity and an
-                    // extra r to normalize the r̄ vector.
-                    let f = r_vec * self.G * a.mass * b.mass / r.powi(3);
-                    if let Ok([ad, bd]) = d.bodies.get_disjoint_mut([i, j]) {
-                        ad.apply_acceleration(&(-&f / a.mass));
-                        bd.apply_acceleration(&(&f / b.mass));
-                    }
-                }
-            }
-        }
-        d
-    }
-
     pub fn from_init_state(
         init_states: Vec<InitState>,
-        p: PhysicalConstantsVec,
+        p: &PhysicalConstantsVec,
     ) -> NBodySimulation {
         let mut sim = NBodySimulation::default();
         sim.bodies.reserve(init_states.len());
@@ -469,6 +458,31 @@ impl NBodySimulation {
             }
         }
         sim
+    }
+}
+impl Differentiable<NBodySimulationDerivative> for NBodySimulation {
+    fn derivative(&self) -> NBodySimulationDerivative {
+        let mut d = NBodySimulationDerivative::default();
+        d.bodies.reserve(self.bodies.len());
+        for b in self.bodies.iter() {
+            d.bodies.push(b.derivative());
+        }
+        for i in 0..self.bodies.len() {
+            for j in (i + 1)..self.bodies.len() {
+                let a = &self.bodies[i];
+                let b = &self.bodies[j];
+                let r_vec = a.position - b.position;
+                let r = r_vec.norm();
+                // r^3 because it's r^2 in the law of gravity and an
+                // extra r to normalize the r̄ vector.
+                let f = r_vec * self.G * a.mass * b.mass / r.powi(3);
+                if let Ok([ad, bd]) = d.bodies.get_disjoint_mut([i, j]) {
+                    ad.apply_acceleration(&(-&f / a.mass));
+                    bd.apply_acceleration(&(&f / b.mass));
+                }
+            }
+        }
+        d
     }
 }
 
@@ -507,8 +521,26 @@ fn main() -> std::io::Result<()> {
         &physical_constants.v.len(),
         &init_state.len(),
     );
-    let mut sim = NBodySimulation::from_init_state(init_state, physical_constants);
+
+    let mut sim = NBodySimulation::from_init_state(init_state, &physical_constants);
     println!("n_bodies={}", sim.bodies.len());
+
+    let fc = File::create("output.cnp.bin")?;
+    let mut message = message::Builder::new_default();
+    let state = message.init_root::<physical_constants::Builder>();
+    let mut bodies = state.init_bodies(sim.bodies.len() as u32);
+    for (i, b) in sim.bodies.iter().enumerate() {
+        let pc = physical_constants.by_spkid(b.spkid).unwrap();
+        let mut body = bodies.reborrow().get(i as u32);
+        body.set_spkid(pc.spkid);
+        body.set_name(&pc.name);
+        body.set_mass(pc.gm * GM_TO_GRAM);
+        body.set_radius(pc.radius.value);
+    }
+    let r = serialize_packed::write_message(&fc, &message);
+    if let Err(e) = r {
+        println!("{:?}", e);
+    }
 
     let minute = 60.0;
     let hour = 60.0 * minute;
@@ -518,9 +550,6 @@ fn main() -> std::io::Result<()> {
 
     let t_max = year;
     sim.dt = minute;
-
-    let fc = File::create("output.cnp.bin")?;
-    let mut ft = File::create("output.txt")?;
 
     let start = Instant::now();
     while sim.t < t_max {
@@ -543,12 +572,7 @@ fn main() -> std::io::Result<()> {
         for (i, b) in sim.bodies.iter().enumerate() {
             let p = &b.position;
 
-            ft.write_all(
-                format!("{} {} {} {} {} {}\n", p.x, p.y, p.z, i, sim.t, b.spkid).as_bytes(),
-            )?;
-
             let mut body = bodies.reborrow().get(i as u32);
-            body.set_spkid(b.spkid as u64);
             body.set_x(p.x);
             body.set_y(p.y);
             body.set_z(p.z);
