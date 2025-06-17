@@ -415,7 +415,6 @@ trait Integrator {
     fn step<'a, T, DT>(self, start: &'a mut T, dt: f64)
     where
         T: Differentiable<DT> + Add<Output = T> + AddAssign + 'a,
-        &'a mut T: AddAssign<T>,
         &'a T: Add<T, Output = T>,
         DT: Derivative<T>
             + Default
@@ -451,7 +450,6 @@ impl Integrator for RungeKutta3 {
     fn step<'a, T, DT>(self, start: &'a mut T, dt: f64)
     where
         T: Differentiable<DT> + Add<Output = T> + AddAssign + 'a,
-        &'a mut T: AddAssign<T>,
         &'a T: Add<T, Output = T>,
         DT: Derivative<T>
             + Default
