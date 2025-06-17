@@ -411,6 +411,71 @@ impl Default for NBodySimulation {
     }
 }
 
+trait Integrator {
+    fn step<'a, T, DT>(self, start: &'a mut T, dt: f64)
+    where
+        T: Differentiable<DT> + Add<Output = T> + AddAssign + 'a,
+        &'a mut T: AddAssign<T>,
+        &'a T: Add<T, Output = &'a T>,
+        DT: Derivative<T>
+            + Default
+            + MulAssign<f64>
+            + Add<Output = DT>
+            + Add<&'a DT, Output = DT>
+            + 'a,
+        &'a DT: MulAssign<f64>;
+}
+
+struct RungeKutta3;
+
+/*
+ * error[E0502]: cannot borrow `start` as mutable because it is also borrowed as immutable
+ *   --> src/main.rs:456:9
+ *    |
+ *432 |     fn step<'a, T, DT>(self, mut start: &'a mut T, dt: f64)
+ *    |             -- lifetime `'a` defined here
+ *...
+ *445 |         let s = &*start;
+ *    |                 -------
+ *    |                 |
+ *    |                 immutable borrow occurs here
+ *    |                 assignment requires that `*start` is borrowed for `'a`
+ *...
+ *456 |         start += d.step(dt);
+ *    |         ^^^^^^^^^^^^^^^^^^^ mutable borrow occurs here
+ *
+ *For more information about this error, try `rustc --explain E0502`.
+ *
+ */
+impl Integrator for RungeKutta3 {
+    fn step<'a, T, DT>(self, mut start: &'a mut T, dt: f64)
+    where
+        T: Differentiable<DT> + Add<Output = T> + AddAssign + 'a,
+        &'a mut T: AddAssign<T>,
+        &'a T: Add<T, Output = &'a T>,
+        DT: Derivative<T>
+            + Default
+            + MulAssign<f64>
+            + Add<Output = DT>
+            + Add<&'a DT, Output = DT>
+            + 'a,
+        &'a DT: MulAssign<f64>,
+    {
+        let s = &*start;
+        let k1 = s.derivative();
+        let mut k2 = (s + k1.step(dt / 2.0)).derivative();
+        let mut k3 = (s + k2.step(dt / 2.0)).derivative();
+        let k4 = (s + k3.step(dt)).derivative();
+
+        k2 *= 2.0;
+        k3 *= 2.0;
+
+        let mut d = k1 + k2 + k3 + k4;
+        d *= 1.0 / 6.0;
+        start += d.step(dt);
+    }
+}
+
 impl NBodySimulation {
     fn update(&mut self) {
         self.simple_step();
